@@ -8,17 +8,21 @@ const { Readable } = require('stream');
 
 const app = express();
 
+// Enable CORS for all routes and handle OPTIONS preflight explicitly
 app.use(cors());
+app.options('*', cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static assets safely from the 'public' folder
+// Serve static assets from 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Validate environment variables on startup
-if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-    console.error('CRITICAL: Cloudinary environment variables are missing!');
-}
+// Debug logger to see incoming requests in Render Logs
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    next();
+});
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -28,7 +32,7 @@ cloudinary.config({
 
 const upload = multer({ 
     storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+    limits: { fileSize: 10 * 1024 * 1024 }
 });
 
 let latestImageUrl = '';
@@ -71,13 +75,8 @@ app.post('/api/upload', (req, res) => {
             }
         );
 
-        // Pipe buffer safely using native Node Readable stream
         Readable.from(req.file.buffer).pipe(uploadStream);
     });
-});
-
-app.get('/ping', (req, res) => {
-    res.status(200).send('pong');
 });
 
 // Global Error Handler
