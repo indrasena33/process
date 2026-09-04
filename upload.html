@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Image - Pixel Animation</title>
+    <style>
+        body { font-family: sans-serif; background: #000; color: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: #111; border: 1px solid #333; padding: 30px; border-radius: 8px; text-align: center; width: 350px; box-shadow: 0 4px 20px rgba(0,0,0,0.8); }
+        input[type="file"] { margin: 20px 0; display: block; width: 100%; color: #aaa; }
+        button { background: #4f46e5; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; font-weight: bold; }
+        button:hover { background: #4338ca; }
+        #status { margin-top: 15px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Upload Animation Image</h2>
+        <form id="uploadForm">
+            <input type="file" id="imageInput" accept="image/*" required>
+            <button type="submit" id="submitBtn">Upload & Set Live</button>
+        </form>
+        <div id="status"></div>
+    </div>
+    <script>
+        const form = document.getElementById('uploadForm');
+        const statusDiv = document.getElementById('status');
+        const submitBtn = document.getElementById('submitBtn');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('imageInput');
+            if (fileInput.files.length === 0) return;
+
+            const formData = new FormData();
+            formData.append('image', fileInput.files[0]);
+
+            submitBtn.disabled = true;
+            statusDiv.style.color = '#aaa';
+            statusDiv.textContent = 'Uploading to Cloudinary...';
+
+            try {
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    statusDiv.style.color = '#4ade80';
+                    statusDiv.textContent = 'Success! Redirecting to live animation...';
+                    setTimeout(() => { window.location.href = '/'; }, 1500);
+                } else {
+                    throw new Error(data.error || 'Upload failed');
+                }
+            } catch (err) {
+                submitBtn.disabled = false;
+                statusDiv.style.color = '#f87171';
+                statusDiv.textContent = 'Error: ' + err.message;
+            }
+        });
+    </script>
+</body>
+</html>
