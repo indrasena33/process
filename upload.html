@@ -44,7 +44,15 @@
                     method: 'POST',
                     body: formData
                 });
-                const data = await res.json();
+
+                const text = await res.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (parseError) {
+                    throw new Error(`Server error (${res.status}): ${text.slice(0, 100) || 'Invalid response'}`);
+                }
+
                 if (res.ok) {
                     statusDiv.style.color = '#4ade80';
                     statusDiv.textContent = 'Success! Redirecting to live animation...';

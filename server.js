@@ -1,36 +1,32 @@
+require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const path = require('path');
 
 const app = express();
 
-// Configure Cloudinary with environment variables
+app.use(express.json());
+app.use(express.static(path.join(__dirname)));
+
+// Validate environment variables on startup
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    console.error('CRITICAL: Cloudinary environment variables are missing from your .env file!');
+}
+
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'pixel-animations',
-        allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
-    }
+const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
-const upload = multer({ storage: storage });
-
-// In-memory store for the latest active image URL
 let latestImageUrl = '';
 
-// Serve static files from the root directory
-app.use(express.static(path.join(__dirname)));
-app.use(express.json());
-
-// Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -43,17 +39,42 @@ app.get('/api/latest-image', (req, res) => {
     res.json({ url: latestImageUrl });
 });
 
-app.post('/api/upload', upload.single('image'), (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-    }
-    latestImageUrl = req.file.path; // Secure Cloudinary URL
-    res.json({ success: true, url: latestImageUrl });
+app.post('/api/upload', (req, res, next) => {
+    upload.single('image')(req, res, function (err) {
+        if (err) {
+            console.error('Multer error:', err);
+            return res.status(400).json({ error: err.message || 'File upload error' });
+        }
+        
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const uploadStream = cloudinary.uploader.upload_stream(
+            { folder: 'pixel-animations', resource_type: 'auto' },
+            (error, result) => {
+                if (error) {
+                    console.error('Cloudinary API error:', error);
+                    return res.status(500).json({ error: error.message || 'Cloudinary upload failed' });
+                }
+                latestImageUrl = result.secure_url;
+                console.log('Successfully uploaded image:', latestImageUrl);
+                return res.json({ success: true, url: latestImageUrl });
+            }
+        );
+
+        uploadStream.end(req.file.buffer);
+    });
 });
 
-// Keep-alive endpoint to prevent Render spin-down
 app.get('/ping', (req, res) => {
     res.status(200).send('pong');
+});
+
+// Global Error Handler: Prevents Express from sending HTML error pages
+app.use((err, req, res, next) => {
+    console.error('Unhandled server error:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
 });
 
 const PORT = process.env.PORT || 3000;
