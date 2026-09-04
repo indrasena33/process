@@ -12,5 +12,18 @@
     "dotenv": "^16.6.1",
     "express": "^4.22.2",
     "multer": "^1.4.5-lts.2"
-  }
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/indrasena33/process.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/indrasena33/process/issues"
+  },
+  "homepage": "https://github.com/indrasena33/process#readme"
 }

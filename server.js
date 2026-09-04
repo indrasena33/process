@@ -8,21 +8,20 @@ const { Readable } = require('stream');
 
 const app = express();
 
-// Enable CORS for all routes and handle OPTIONS preflight explicitly
+// Enable CORS and handle OPTIONS preflight
 app.use(cors());
 app.options('*', cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static assets from 'public' folder
+// Serve static assets safely from the 'public' folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Debug logger to see incoming requests in Render Logs
-app.use((req, res, next) => {
-    console.log(`${req.method} ${req.url}`);
-    next();
-});
+// Validate environment variables on startup
+if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+    console.error('CRITICAL: Cloudinary environment variables are missing!');
+}
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -32,12 +31,12 @@ cloudinary.config({
 
 const upload = multer({ 
     storage: multer.memoryStorage(),
-    limits: { fileSize: 10 * 1024 * 1024 }
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
 let latestImageUrl = '';
 
-// HTML Routes
+// HTML View Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -51,7 +50,8 @@ app.get('/api/latest-image', (req, res) => {
     res.json({ url: latestImageUrl });
 });
 
-app.post('/api/upload', (req, res) => {
+// Accept POST upload requests on both /api/upload and /upload to prevent route mismatches
+app.post(['/api/upload', '/upload'], (req, res) => {
     upload.single('image')(req, res, function (err) {
         if (err) {
             console.error('Multer error:', err);
@@ -75,8 +75,13 @@ app.post('/api/upload', (req, res) => {
             }
         );
 
+        // Pipe memory buffer securely to Cloudinary using Node Readable stream
         Readable.from(req.file.buffer).pipe(uploadStream);
     });
+});
+
+app.get('/ping', (req, res) => {
+    res.status(200).send('pong');
 });
 
 // Global Error Handler

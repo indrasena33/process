@@ -41,6 +41,7 @@
             statusDiv.textContent = 'Uploading to Cloudinary...';
 
             try {
+                // Targets the explicit API upload endpoint relative to current origin
                 const res = await fetch('/api/upload', {
                     method: 'POST',
                     body: formData
