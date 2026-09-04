@@ -3,15 +3,21 @@ const express = require('express');
 const multer = require('multer');
 const cloudinary = require('cloudinary').v2;
 const path = require('path');
+const cors = require('cors');
+const { Readable } = require('stream');
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname)));
+app.use(express.urlencoded({ extended: true }));
+
+// Serve static assets safely from the 'public' folder
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Validate environment variables on startup
 if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
-    console.error('CRITICAL: Cloudinary environment variables are missing from your .env file!');
+    console.error('CRITICAL: Cloudinary environment variables are missing!');
 }
 
 cloudinary.config({
@@ -27,19 +33,21 @@ const upload = multer({
 
 let latestImageUrl = '';
 
+// HTML Routes
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.get('/upload', (req, res) => {
-    res.sendFile(path.join(__dirname, 'upload.html'));
+    res.sendFile(path.join(__dirname, 'public', 'upload.html'));
 });
 
+// API Routes
 app.get('/api/latest-image', (req, res) => {
     res.json({ url: latestImageUrl });
 });
 
-app.post('/api/upload', (req, res, next) => {
+app.post('/api/upload', (req, res) => {
     upload.single('image')(req, res, function (err) {
         if (err) {
             console.error('Multer error:', err);
@@ -63,7 +71,8 @@ app.post('/api/upload', (req, res, next) => {
             }
         );
 
-        uploadStream.end(req.file.buffer);
+        // Pipe buffer safely using native Node Readable stream
+        Readable.from(req.file.buffer).pipe(uploadStream);
     });
 });
 
@@ -71,7 +80,7 @@ app.get('/ping', (req, res) => {
     res.status(200).send('pong');
 });
 
-// Global Error Handler: Prevents Express from sending HTML error pages
+// Global Error Handler
 app.use((err, req, res, next) => {
     console.error('Unhandled server error:', err);
     res.status(500).json({ error: err.message || 'Internal server error' });
